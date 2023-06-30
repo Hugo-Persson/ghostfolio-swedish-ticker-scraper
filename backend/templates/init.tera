@@ -1,11 +1,5 @@
 {% extends "layout" %}
 {% block title %}Index{% endblock title %}
-{% block head %}
-    {{ super() }}
-    <style type="text/css">
-        .important { color: #336699; }
-    </style>
-{% endblock head %}
 {% block content %}
     <h1>What do you want to do?</h1>
     <div class="card">
@@ -16,3 +10,4 @@
       </div>
     </div>
 {% endblock content %}
+

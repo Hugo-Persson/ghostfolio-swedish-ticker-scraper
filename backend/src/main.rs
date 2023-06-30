@@ -10,7 +10,7 @@ fn main() {
     rocket::ignite()
         .register(catchers![not_found])
         .mount("/api", routes![hello])
-        .mount("/", routes![index])
+        .mount("/", routes![index, init])
         .attach(Template::fairing())
         .launch();
 }
@@ -48,4 +48,9 @@ fn index() -> Template {
         last_name: String::from("Don"),
     };
     Template::render("index", context)
+}
+
+#[get("/init")]
+fn init() -> Template {
+    Template::render("init", {})
 }
