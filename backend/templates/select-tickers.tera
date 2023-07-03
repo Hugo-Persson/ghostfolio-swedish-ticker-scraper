@@ -3,6 +3,5 @@
 {% block content %}
 <h1>Select tickers to init</h1>
 <p>Please select the tickers to init</p>
-{% column %}
 {% endblock content %}
 

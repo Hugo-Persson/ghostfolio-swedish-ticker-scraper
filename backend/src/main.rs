@@ -2,12 +2,13 @@
 #[macro_use]
 extern crate rocket;
 
-use std::collections::HashMap;
-
+use rocket::form::Form;
+use rocket::fs::TempFile;
 use rocket::serde::{json::Json, Deserialize};
-use rocket::{response::content::Json, Request};
-use rocket_contrib::{json, templates::Template};
+use rocket::Request;
+use rocket_dyn_templates::Template;
 use serde::Serialize;
+use serde_json::json;
 
 // extern crate rocket_multipart_form_data;
 //
@@ -18,13 +19,12 @@ use serde::Serialize;
 //     MultipartFormData, MultipartFormDataField, MultipartFormDataOptions,
 // };
 
-fn main() {
-    rocket::ignite()
-        .register(catchers![not_found])
+#[launch]
+fn rocket() -> _ {
+    rocket::build()
         .mount("/api", routes![hello])
-        .mount("/", routes![index, init, init_submit])
+        .mount("/", routes![index, init, init_form])
         .attach(Template::fairing())
-        .launch();
 }
 
 #[get("/hello")]
@@ -73,53 +73,25 @@ fn missing_data_init() -> Template {
 }
 
 #[derive(Deserialize)]
-#[serde(crate = "rocket::serde")]
-struct Tic<'r> {
-    description: &'r str,
-    complete: bool,
+struct InitTickersData {
+    csv_content: String,
+    isin_column: String,
 }
 
-#[post("/init", data = "<tickers>")]
-fn init_submit(tickers: Json<Vec<String>>) -> String {
-    let parsed_tickers = serde_json::from_value(tickers);
-    for ticker in parsed_tickers {
-        println!("{}", ticker);
-    }
-    return "Done".to_string();
+#[post("/init", data = "<data>")]
+fn init_submit(data: Json<InitTickersData>) -> String {
+    let d: InitTickersData = data.into_inner();
+    return format!("Done, column {}", d.isin_column).to_string();
 }
 
-// #[post("/init", data = "<data>")]
-// fn init_submit(content_type: &ContentType, data: Data) -> Template {
-//     let mut options = MultipartFormDataOptions::with_multipart_form_data_fields(vec![
-//         MultipartFormDataField::file("csv")
-//             .content_type_by_string(Some("text/csv"))
-//             .unwrap(),
-//         MultipartFormDataField::text("isinColumn"),
-//     ]);
-//     let mut multipart_form_data = MultipartFormData::parse(content_type, data, options).unwrap();
-//
-//     let csv_arr = match multipart_form_data.files.get("csv") {
-//         Some(file) => file,
-//         None => return missing_data_init(),
-//     };
-//     let csv = &csv_arr[0];
-//     let isin_column_arr = match multipart_form_data.texts.remove("isinColumn") {
-//         Some(data) => data,
-//         None => return missing_data_init(),
-//     };
-//
-//     let isin_column = &isin_column_arr[0];
-//
-//     #[derive(Serialize)]
-//     struct Context {
-//         column: String,
-//         csv_content: String,
-//     }
-//
-//     let csv_content = csv.file_name.clone().unwrap_or("err".to_string());
-//     let context = Context {
-//         column: isin_column.text.clone(),
-//         csv_content: csv_content.to_string(),
-//     };
-//     Template::render("select-tickers", context)
-// }
+#[derive(FromForm)]
+struct InitTickersFormData<'r> {
+    isin_column: bool,
+    file: TempFile<'r>,
+}
+
+#[post("/init", data = "<data>")]
+fn init_form(data: Form<InitTickersFormData<'_>>) -> &'static str {
+    println!("{}", data.isin_column);
+    return "Success";
+}
