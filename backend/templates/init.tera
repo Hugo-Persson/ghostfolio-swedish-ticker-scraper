@@ -1,13 +1,21 @@
 {% extends "layout" %}
 {% block title %}Index{% endblock title %}
 {% block content %}
-    <h1>What do you want to do?</h1>
-    <div class="card">
-      <div class="card-body">
-        <h5 class="card-title">Init ticker</h5>
-    <p class="card-text">Lorem ipsum dolor sit amet, qui minim labore adipisicing minim sint cillum sint consectetur cupidatat.</p>
-        <a href="/init" class="btn btn-primary">Init tickers</a>
-      </div>
-    </div>
+<h1>Please upload CSV file</h1>
+<p>The file should contain one column that corresponds to ISIN value</p>
+<form>
+  <div class="mb-3">
+    <label for="isinColumn" class="form-label">ISIN column name</label>
+    <input type="text" class="form-control" name="isinColumn" id="isinColumn" placeholder="ISIN" required>
+  </div>
+  <div class="mb-3">
+    <label for="csv" class="form-label">Upload CSV file </label>
+    <input class="form-control form-control-lg" id="csv" name="csv" type="file" required />
+  </div>
+
+
+
+  <button type="submit" class="btn btn-primary">Submit</button>
+</form>
 {% endblock content %}
 
