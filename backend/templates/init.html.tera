@@ -3,10 +3,10 @@
 {% block content %}
 <h1>Please upload CSV file</h1>
 <p>The file should contain one column that corresponds to ISIN value</p>
-<form>
+<form method="post" enctype="multipart/form-data" >
   <div class="mb-3">
-    <label for="isinColumn" class="form-label">ISIN column name</label>
-    <input type="text" class="form-control" name="isinColumn" id="isinColumn" placeholder="ISIN" required>
+    <label for="isin_column" class="form-label">ISIN column name</label>
+    <input type="text" class="form-control" name="isin_column" id="isin_column" placeholder="ISIN" required>
   </div>
   <div class="mb-3">
     <label for="csv" class="form-label">Upload CSV file </label>

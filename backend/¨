@@ -84,35 +84,28 @@ struct InitTickersFormData<'r> {
     csv: TempFile<'r>,
 }
 
-// fn extract_column_from_csn(column_index: usize, row: StringRecord) -> &'static str {
-//     let col_val = row.get(column_index).unwrap();
-//     return col_val;
-// }
-fn extract_column_from_csn(column_index: usize, row: StringRecord) -> String {
-    let col_val = row.get(column_index).unwrap().to_string();
+fn extract_column_from_csn(column_index: usize, row: StringRecord) -> &'static str {
+    let col_val = row.get(column_index).unwrap();
     return col_val;
 }
 
-fn get_tickers_from_csv<'a>(path: &'a Path, isin_column: &'a String) -> Vec<String> {
+async fn get_tickers_from_csv(path: &Path, isin_column: &String) -> Vec<&str> {
     let mut csv_reader = ReaderBuilder::new()
         .delimiter(b';')
         .from_path(path)
         .unwrap();
     println!("Headers: {:#?} ", csv_reader.headers());
-    println!("ISIN column: {}", isin_column);
     let index_of_isin = csv_reader
         .headers()
         .unwrap()
         .iter()
         .position(|r| r == isin_column)
         .unwrap();
-    let mut tickers: Vec<String> = csv_reader
+    let tickers: Vec<&str> = csv_reader
         .records()
         .filter(|e| e.is_ok())
         .map(|e| extract_column_from_csn(index_of_isin, e.unwrap()))
-        .filter(|e| e != &"-".to_string())
         .collect();
-    tickers.dedup();
     return tickers;
 }
 
@@ -120,8 +113,6 @@ fn get_tickers_from_csv<'a>(path: &'a Path, isin_column: &'a String) -> Vec<Stri
 async fn init_form(mut data: Form<InitTickersFormData<'_>>) -> &'static str {
     println!("Column: {}", data.isin_column);
     println!("File: {:#?} ", data.csv);
-
     let tickers = get_tickers_from_csv(data.csv.path().unwrap(), &data.isin_column);
-    println!("{:#?}", tickers);
     return "Success";
 }
