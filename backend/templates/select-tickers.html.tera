@@ -1,7 +1,36 @@
-{% extends "layout" %}
-{% block title %}Index{% endblock title %}
-{% block content %}
+{% extends "layout" %} {% block title %}Index{% endblock title %} {% block
+content %}
+
 <h1>Select tickers to init</h1>
 <p>Please select the tickers to init</p>
-{% endblock content %}
+<form method="post" action="/select-tickers">
+  <table class="table">
+    <thead>
+      <th></th>
+      <th>Name</th>
+      <th>price</th>
+    </thead>
+    <tbody>
+      {% for hit in hits %}
+      <tr>
+        <td>
+          <input
+            class="form-check-input"
+            type="checkbox"
+            name="ids[]"
+            value="{{ hit.link.orderbookId }}"
+          />
+        </td>
+        <td>{{ hit.highlightedDisplayTitle }}</td>
+        <td>{{ hit.lastPrice }} {{ hit.currency }}</td>
+      </tr>
 
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="d-flex justify-content-end">
+    <button type="submit" class="btn btn-primary">Submit</button>
+  </div>
+</form>
+
+{% endblock content %}

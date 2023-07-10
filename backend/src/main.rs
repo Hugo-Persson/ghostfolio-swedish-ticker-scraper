@@ -2,9 +2,13 @@
 #[macro_use]
 extern crate rocket;
 
+mod AvanzaSearch;
+
 use std::path::Path;
 
 use csv::{Reader, ReaderBuilder, StringRecord};
+use futures::future::join_all;
+use futures::stream::StreamExt;
 use rocket::form::Form;
 use rocket::fs::TempFile;
 use rocket::serde::{json::Json, Deserialize};
@@ -12,6 +16,8 @@ use rocket::Request;
 use rocket_dyn_templates::{context, Template};
 use serde::Serialize;
 use serde_json::json;
+
+use crate::AvanzaSearch::{search_avanza, Hit};
 
 // extern crate rocket_multipart_form_data;
 //
@@ -117,11 +123,36 @@ fn get_tickers_from_csv<'a>(path: &'a Path, isin_column: &'a String) -> Vec<Stri
 }
 
 #[post("/init", data = "<data>")]
-async fn init_form(mut data: Form<InitTickersFormData<'_>>) -> &'static str {
+async fn init_form(mut data: Form<InitTickersFormData<'_>>) -> Template {
     println!("Column: {}", data.isin_column);
-    println!("File: {:#?} ", data.csv);
+    // println!("File: {:#?} ", data.csv);
 
     let tickers = get_tickers_from_csv(data.csv.path().unwrap(), &data.isin_column);
+    let hits_async = tickers[1..3].iter().map(search_avanza); // We only take 10 at a time. Buld
+    let mut hits_result: Vec<Hit> = vec![];
+    for hit in hits_async {
+        let res = hit.await;
+        if res.is_ok() {
+            hits_result.push(res.unwrap());
+        }
+    }
+
     println!("{:#?}", tickers);
-    return "Success";
+    info!("Result from avanza is: {:#?}", hits_result);
+
+    Template::render(
+        "select-tickers",
+        context! {
+            hits: hits_result
+        },
+    )
+}
+
+#[derive(FromForm)]
+struct SelectTickersForm<'r> {
+    ids: Vec<String>,
+}
+#[post("/init", data = "<data>")]
+fn select_tickers(data: Form<SelectTickersForm<'_>>) -> Template {
+    todo!("Finish")
 }
