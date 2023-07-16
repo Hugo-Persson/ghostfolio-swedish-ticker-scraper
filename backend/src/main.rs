@@ -2,22 +2,33 @@
 #[macro_use]
 extern crate rocket;
 
+mod AvanzaGetFundInfo;
 mod AvanzaSearch;
+mod ghostfolio_api;
 
 use std::path::Path;
 
+use crate::ghostfolio_api::prepare_insert_fund;
+use crate::AvanzaGetFundInfo::get_avanza_fund_info;
+use crate::AvanzaSearch::{search_avanza, Hit};
 use csv::{Reader, ReaderBuilder, StringRecord};
-use futures::future::join_all;
+use dotenv::dotenv;
 use futures::stream::StreamExt;
 use rocket::form::Form;
 use rocket::fs::TempFile;
 use rocket::serde::{json::Json, Deserialize};
 use rocket::Request;
+use rocket_db_pools::{sqlx, Database};
 use rocket_dyn_templates::{context, Template};
 use serde::Serialize;
 use serde_json::json;
 
-use crate::AvanzaSearch::{search_avanza, Hit};
+#[derive(Database)]
+#[database("postgres_ghostfolio")]
+struct GhostfolioDB(sqlx::PgPool);
+
+use rocket_db_pools::sqlx::Row;
+use rocket_db_pools::Connection;
 
 // extern crate rocket_multipart_form_data;
 //
@@ -30,9 +41,11 @@ use crate::AvanzaSearch::{search_avanza, Hit};
 
 #[launch]
 fn rocket() -> _ {
+    dotenv().ok();
     rocket::build()
+        .attach(GhostfolioDB::init())
         .mount("/api", routes![hello])
-        .mount("/", routes![index, init, init_form])
+        .mount("/", routes![index, init, init_form, select_tickers])
         .attach(Template::fairing())
 }
 
@@ -148,11 +161,25 @@ async fn init_form(mut data: Form<InitTickersFormData<'_>>) -> Template {
     )
 }
 
-#[derive(FromForm)]
-struct SelectTickersForm<'r> {
+#[derive(FromForm, Debug)]
+struct SelectTickersForm {
     ids: Vec<String>,
 }
-#[post("/init", data = "<data>")]
-fn select_tickers(data: Form<SelectTickersForm<'_>>) -> Template {
-    todo!("Finish")
+#[post("/select-tickers", data = "<data>")]
+async fn select_tickers(
+    mut db: Connection<GhostfolioDB>,
+    data: Form<SelectTickersForm>,
+) -> &'static str {
+    println!("Data: {:#?}", data);
+    for id in &data.ids {
+        let info = get_avanza_fund_info(id).await.unwrap();
+        let query = prepare_insert_fund(info);
+        let res = sqlx::query(query.expect("Could not get query").as_str())
+            .fetch_one(&mut *db)
+            .await
+            .unwrap();
+        println!("Res: {:#?}", res.columns());
+    }
+
+    return "Success, done";
 }
