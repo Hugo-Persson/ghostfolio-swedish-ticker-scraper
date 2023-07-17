@@ -83,7 +83,7 @@ fn prepare_avanza_search_body(isin: &String) -> serde_json::Value {
     })
 }
 
-pub async fn search_avanza(isin: &String) -> Result<Hit, Box<dyn Error>> {
+pub async fn search_avanza(isin: &String) -> Result<(&String, Hit), Box<dyn Error>> {
     let url = "https://www.avanza.se/_api/search/global-search?limit=10";
     let post_body = prepare_avanza_search_body(isin);
     info!("Post body: {:#?}", post_body);
@@ -92,7 +92,7 @@ pub async fn search_avanza(isin: &String) -> Result<Hit, Box<dyn Error>> {
     if response.status().is_success() {
         let mut parsed_response: AvanzaSearchResult = response.json().await?;
         let hit = parsed_response.result_groups.remove(0).hits.remove(0);
-        Ok(hit)
+        Ok((isin, hit))
     } else {
         Err("Errr".into())
     }

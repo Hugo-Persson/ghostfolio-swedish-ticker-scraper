@@ -1,5 +1,11 @@
 use crate::AvanzaGetFundInfo::AvanzaFundInfo;
+use crate::GhostfolioDB;
+use uuid::Uuid;
 
+use rocket_db_pools::sqlx::Row;
+use rocket_db_pools::Connection;
+
+use rocket_db_pools::{sqlx, Database};
 use serde_json::json;
 fn generate_country_json(info: &AvanzaFundInfo) -> String {
     if info.country_chart_data.len() == 0 {
@@ -12,7 +18,7 @@ fn generate_country_json(info: &AvanzaFundInfo) -> String {
         .map(|c| {
             json!({
                 "code": c.country_code,
-                "weight": (c.y as i32)/100
+                "weight": c.y/(100 as f64)
             })
         })
         .collect();
@@ -23,14 +29,17 @@ fn get_current_date() -> String {
     todo!("Get current date")
 }
 
-fn generate_url(info: &AvanzaFundInfo) -> String {
-    format!("https://www.avanza.se/fonder/om-fonden.html/{}", "dd")
+fn generate_url(orderbook_id: &String) -> String {
+    format!(
+        "https://www.avanza.se/fonder/om-fonden.html/{}",
+        orderbook_id
+    )
 }
 
-fn scraper_config(info: &AvanzaFundInfo) -> Result<std::string::String, serde_json::Error> {
+fn scraper_config(orderbook_id: &String) -> Result<std::string::String, serde_json::Error> {
     let value = json!({
         "source": "avanza",
-        "orderbook_id": "1"
+        "orderbook_id": orderbook_id
     });
     serde_json::to_string(&value)
 }
@@ -44,7 +53,7 @@ fn generate_sectors_json(info: &AvanzaFundInfo) -> Result<std::string::String, s
         .map(|s| {
             json!({
                 "name": s.name,
-                "weight": (s.y as i32)/100,
+                "weight": s.y /(100 as f64),
             })
         })
         .collect();
@@ -53,27 +62,38 @@ fn generate_sectors_json(info: &AvanzaFundInfo) -> Result<std::string::String, s
 fn generate_ticker_name(info: &AvanzaFundInfo) -> String {
     info.name.replace(" ", "_").to_uppercase()
 }
+fn generate_id() -> String {
+    Uuid::new_v4().to_string()
+}
 
-pub fn prepare_insert_fund(info: AvanzaFundInfo) -> Result<std::string::String, serde_json::Error> {
+pub fn prepare_insert_fund(
+    info: AvanzaFundInfo,
+    orderbook_id: &String,
+) -> Result<std::string::String, serde_json::Error> {
     // TODO: bind instead of insert directly
     let query = format!(
         r#"INSERT INTO public."SymbolProfile" (countries, "createdAt", "dataSource", id, name, "updatedAt", symbol, sectors,
                                     currency, "assetClass", "assetSubClass", "symbolMapping", "scraperConfiguration",
                                     url, comment, isin)
-VALUES ('{}', '{}', 'MANUAL'::"DataSource", null, '{}',
-        '{}', '{}', '{}', 'SEK',
-        'EQUITY'::"AssetClass", 'MUTUALFUND'::"AssetSubClass", null, {},
+VALUES ('{}', current_timestamp, 'MANUAL'::"DataSource", '{}', '{}',
+        current_timestamp, '{}', '{}', 'SEK',
+        'EQUITY'::"AssetClass", 'MUTUALFUND'::"AssetSubClass", null, '{}',
         '{}', null, '{}');
 "#,
         generate_country_json(&info),
-        get_current_date(),
+        generate_id(),
         info.name,
-        get_current_date(),
         generate_ticker_name(&info),
         generate_sectors_json(&info)?,
-        scraper_config(&info)?,
-        generate_url(&info),
+        scraper_config(orderbook_id)?,
+        generate_url(orderbook_id),
         info.isin,
     );
     Ok(query)
+}
+
+pub async fn isin_exists(isin: &String, mut db: &mut Connection<GhostfolioDB>) -> bool {
+    let query = r#"SELECT id FROM "SymbolProfile" WHERE isin = '?' LIMIT 1;"#;
+    let res = sqlx::query(query).bind(isin).fetch_one(db).await;
+    res.is_ok()
 }

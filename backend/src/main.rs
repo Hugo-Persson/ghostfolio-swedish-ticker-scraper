@@ -8,7 +8,7 @@ mod ghostfolio_api;
 
 use std::path::Path;
 
-use crate::ghostfolio_api::prepare_insert_fund;
+use crate::ghostfolio_api::{isin_exists, prepare_insert_fund};
 use crate::AvanzaGetFundInfo::get_avanza_fund_info;
 use crate::AvanzaSearch::{search_avanza, Hit};
 use csv::{Reader, ReaderBuilder, StringRecord};
@@ -25,7 +25,7 @@ use serde_json::json;
 
 #[derive(Database)]
 #[database("postgres_ghostfolio")]
-struct GhostfolioDB(sqlx::PgPool);
+pub struct GhostfolioDB(sqlx::PgPool);
 
 use rocket_db_pools::sqlx::Row;
 use rocket_db_pools::Connection;
@@ -136,7 +136,10 @@ fn get_tickers_from_csv<'a>(path: &'a Path, isin_column: &'a String) -> Vec<Stri
 }
 
 #[post("/init", data = "<data>")]
-async fn init_form(mut data: Form<InitTickersFormData<'_>>) -> Template {
+async fn init_form(
+    mut db: Connection<GhostfolioDB>,
+    mut data: Form<InitTickersFormData<'_>>,
+) -> Template {
     println!("Column: {}", data.isin_column);
     // println!("File: {:#?} ", data.csv);
 
@@ -145,8 +148,13 @@ async fn init_form(mut data: Form<InitTickersFormData<'_>>) -> Template {
     let mut hits_result: Vec<Hit> = vec![];
     for hit in hits_async {
         let res = hit.await;
-        if res.is_ok() {
-            hits_result.push(res.unwrap());
+        match res {
+            Ok((isin, hit)) => {
+                if !isin_exists(isin, &db).await {
+                    hits_result.push(hit);
+                }
+            }
+            Err(err) => println!("Error: {}", err),
         }
     }
 
@@ -173,12 +181,14 @@ async fn select_tickers(
     println!("Data: {:#?}", data);
     for id in &data.ids {
         let info = get_avanza_fund_info(id).await.unwrap();
-        let query = prepare_insert_fund(info);
-        let res = sqlx::query(query.expect("Could not get query").as_str())
-            .fetch_one(&mut *db)
-            .await
-            .unwrap();
-        println!("Res: {:#?}", res.columns());
+        let query = prepare_insert_fund(info, id).expect("Could not get query");
+        println!("Query {}", query);
+        let res = sqlx::query(query.as_str()).execute(&mut *db).await;
+
+        match res {
+            Ok(_) => println!("Ok"),
+            Err(err) => println!("Error: {}", err),
+        }
     }
 
     return "Success, done";
