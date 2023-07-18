@@ -8,7 +8,7 @@ mod ghostfolio_api;
 
 use std::path::Path;
 
-use crate::ghostfolio_api::{isin_exists, prepare_insert_fund};
+use crate::ghostfolio_api::prepare_insert_fund;
 use crate::AvanzaGetFundInfo::get_avanza_fund_info;
 use crate::AvanzaSearch::{search_avanza, Hit};
 use csv::{Reader, ReaderBuilder, StringRecord};
@@ -146,11 +146,15 @@ async fn init_form(
     let tickers = get_tickers_from_csv(data.csv.path().unwrap(), &data.isin_column);
     let hits_async = tickers[1..3].iter().map(search_avanza); // We only take 10 at a time. Buld
     let mut hits_result: Vec<Hit> = vec![];
+    let mut ghost_api = ghostfolio_api::GhostfolioAPI::new(db);
+    let isin_in_db = ghost_api.get_isin_in_db().await;
+    println!("Isin in db: {:#?}", isin_in_db);
     for hit in hits_async {
         let res = hit.await;
         match res {
             Ok((isin, hit)) => {
-                if !isin_exists(isin, &db).await {
+                let isin_exists = isin_in_db.contains(&isin);
+                if !isin_exists {
                     hits_result.push(hit);
                 }
             }
@@ -179,11 +183,10 @@ async fn select_tickers(
     data: Form<SelectTickersForm>,
 ) -> &'static str {
     println!("Data: {:#?}", data);
+    let mut ghost_api = ghostfolio_api::GhostfolioAPI::new(db);
     for id in &data.ids {
         let info = get_avanza_fund_info(id).await.unwrap();
-        let query = prepare_insert_fund(info, id).expect("Could not get query");
-        println!("Query {}", query);
-        let res = sqlx::query(query.as_str()).execute(&mut *db).await;
+        let res = ghost_api.insert_fund(info, id).await;
 
         match res {
             Ok(_) => println!("Ok"),

@@ -92,8 +92,44 @@ VALUES ('{}', current_timestamp, 'MANUAL'::"DataSource", '{}', '{}',
     Ok(query)
 }
 
-pub async fn isin_exists(isin: &String, mut db: &mut Connection<GhostfolioDB>) -> bool {
-    let query = r#"SELECT id FROM "SymbolProfile" WHERE isin = '?' LIMIT 1;"#;
-    let res = sqlx::query(query).bind(isin).fetch_one(db).await;
-    res.is_ok()
+pub struct GhostfolioAPI {
+    db: Connection<GhostfolioDB>,
+}
+
+impl GhostfolioAPI {
+    pub fn new(mut db: Connection<GhostfolioDB>) -> Self {
+        Self { db: db }
+    }
+
+    pub async fn isin_exists(&mut self, isin: &String) -> bool {
+        let query = r#"SELECT id FROM "SymbolProfile" WHERE isin = '?' LIMIT 1;"#;
+        let res = sqlx::query(query).bind(isin).fetch_one(&mut *self.db).await;
+        res.is_ok()
+    }
+
+    pub async fn get_isin_in_db(&mut self) -> Vec<String> {
+        let query = r#"SELECT isin FROM "SymbolProfile";"#;
+        let res = sqlx::query(query).fetch_all(&mut *self.db).await;
+        match res {
+            Ok(rows) => rows.iter().map(|row| row.get("isin")).collect(),
+            Err(err) => {
+                println!("Error: {}", err);
+                vec![]
+            }
+        }
+    }
+
+    pub async fn insert_fund(
+        &mut self,
+        info: AvanzaFundInfo,
+        orderbook_id: &String,
+    ) -> Result<(), rocket_db_pools::sqlx::Error> {
+        let query = prepare_insert_fund(info, orderbook_id).expect("Could not get query");
+        println!("Query {}", query);
+        let res = sqlx::query(query.as_str()).execute(&mut *self.db).await;
+        match res {
+            Ok(_) => Ok(()),
+            Err(err) => Err(err),
+        }
+    }
 }
