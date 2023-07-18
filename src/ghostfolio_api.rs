@@ -111,7 +111,11 @@ impl GhostfolioAPI {
         let query = r#"SELECT isin FROM "SymbolProfile";"#;
         let res = sqlx::query(query).fetch_all(&mut *self.db).await;
         match res {
-            Ok(rows) => rows.iter().map(|row| row.get("isin")).collect(),
+            Ok(rows) => rows
+                .iter()
+                .map(|row| row.try_get("isin"))
+                .filter_map(|x| x.ok())
+                .collect(),
             Err(err) => {
                 println!("Error: {}", err);
                 vec![]

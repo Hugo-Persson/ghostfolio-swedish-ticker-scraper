@@ -131,6 +131,7 @@ fn get_tickers_from_csv<'a>(path: &'a Path, isin_column: &'a String) -> Vec<Stri
         .map(|e| extract_column_from_csn(index_of_isin, e.unwrap()))
         .filter(|e| e != &"-".to_string())
         .collect();
+    tickers.sort_unstable();
     tickers.dedup();
     return tickers;
 }
@@ -144,19 +145,21 @@ async fn init_form(
     // println!("File: {:#?} ", data.csv);
 
     let tickers = get_tickers_from_csv(data.csv.path().unwrap(), &data.isin_column);
-    let hits_async = tickers[1..3].iter().map(search_avanza); // We only take 10 at a time. Buld
-    let mut hits_result: Vec<Hit> = vec![];
     let mut ghost_api = ghostfolio_api::GhostfolioAPI::new(db);
     let isin_in_db = ghost_api.get_isin_in_db().await;
-    println!("Isin in db: {:#?}", isin_in_db);
+    println!("ISIN in DB: {:#?}", isin_in_db);
+    println!("Tickers: {:#?}", tickers);
+    let hits_async = tickers
+        .iter()
+        .filter(|x| !isin_in_db.contains(x))
+        .take(10)
+        .map(search_avanza); // We only take 10 at a time. Buld
+    let mut hits_result: Vec<Hit> = vec![];
     for hit in hits_async {
         let res = hit.await;
         match res {
-            Ok((isin, hit)) => {
-                let isin_exists = isin_in_db.contains(&isin);
-                if !isin_exists {
-                    hits_result.push(hit);
-                }
+            Ok((_isin, hit)) => {
+                hits_result.push(hit);
             }
             Err(err) => println!("Error: {}", err),
         }
