@@ -6,22 +6,23 @@ mod AvanzaGetFundInfo;
 mod AvanzaSearch;
 mod ghostfolio_api;
 
-use std::path::Path;
-
 use crate::ghostfolio_api::prepare_insert_fund;
 use crate::AvanzaGetFundInfo::get_avanza_fund_info;
 use crate::AvanzaSearch::{search_avanza, Hit};
 use csv::{Reader, ReaderBuilder, StringRecord};
 use dotenv::dotenv;
 use futures::stream::StreamExt;
+use rocket::fairing::{self, Fairing, Info, Kind};
 use rocket::form::Form;
 use rocket::fs::TempFile;
+use rocket::local::asynchronous::Client;
 use rocket::serde::{json::Json, Deserialize};
-use rocket::Request;
+use rocket::{tokio, Build, Data, Orbit, Request, Response, Rocket};
 use rocket_db_pools::{sqlx, Database};
 use rocket_dyn_templates::{context, Template};
 use serde::Serialize;
 use serde_json::json;
+use std::path::Path;
 
 #[derive(Database)]
 #[database("postgres_ghostfolio")]
@@ -39,14 +40,63 @@ use rocket_db_pools::Connection;
 //     MultipartFormData, MultipartFormDataField, MultipartFormDataOptions,
 // };
 
+struct PostLaunchFairing {}
+
+#[rocket::async_trait]
+impl Fairing for PostLaunchFairing {
+    fn info(&self) -> Info {
+        Info {
+            name: "Post Launch Fairing",
+            kind: Kind::Liftoff,
+        }
+    }
+
+    async fn on_liftoff(&self, _rocket: &Rocket<Orbit>) {
+        println!("Liftoff!");
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(60 * 15));
+            let client: reqwest::Client = reqwest::Client::new();
+            loop {
+                interval.tick().await;
+                println!("Scraping");
+                scrape_job(&client).await;
+            }
+        });
+
+        //let mut response = client.get(uri!(hello)).dispatch();
+        //println!("Response: {}", response.await.into_string().await.unwrap());
+    }
+}
+
+async fn scrape_job(client: &reqwest::Client) -> () {
+    // Call localhost:8000/perform-scrape
+    let mut response = client
+        .get("http://localhost:8000/perform-scrape")
+        .send()
+        .await;
+    match response {
+        Ok(response) => {
+            println!("Response: {:?}", response.text().await);
+        }
+        Err(e) => {
+            println!("Error: {:?}", e);
+        }
+    }
+}
+
 #[launch]
 fn rocket() -> _ {
     dotenv().ok();
+
     rocket::build()
         .attach(GhostfolioDB::init())
         .mount("/api", routes![hello])
-        .mount("/", routes![index, init, init_form, select_tickers])
+        .mount(
+            "/",
+            routes![index, init, init_form, select_tickers, perform_scrape],
+        )
         .attach(Template::fairing())
+        .attach(PostLaunchFairing {})
 }
 
 #[get("/hello")]
@@ -198,4 +248,9 @@ async fn select_tickers(
     }
 
     return "Success, done";
+}
+
+#[get("/perform-scrape")]
+async fn perform_scrape() -> &'static str {
+    "Hello"
 }
