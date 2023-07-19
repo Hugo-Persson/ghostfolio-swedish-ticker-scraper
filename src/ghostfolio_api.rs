@@ -1,11 +1,11 @@
-use crate::AvanzaGetFundInfo::AvanzaFundInfo;
+use crate::avanza_get_fund_info::AvanzaFundInfo;
 use crate::GhostfolioDB;
 use uuid::Uuid;
 
 use rocket_db_pools::sqlx::Row;
 use rocket_db_pools::Connection;
 
-use rocket_db_pools::{sqlx, Database};
+use rocket_db_pools::sqlx;
 use serde_json::json;
 fn generate_country_json(info: &AvanzaFundInfo) -> String {
     if info.country_chart_data.len() == 0 {
@@ -97,7 +97,7 @@ pub struct GhostfolioAPI {
 }
 
 impl GhostfolioAPI {
-    pub fn new(mut db: Connection<GhostfolioDB>) -> Self {
+    pub fn new(db: Connection<GhostfolioDB>) -> Self {
         Self { db: db }
     }
 

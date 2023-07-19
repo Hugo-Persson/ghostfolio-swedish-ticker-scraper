@@ -2,22 +2,21 @@
 #[macro_use]
 extern crate rocket;
 
-mod AvanzaGetFundInfo;
-mod AvanzaSearch;
+mod avanza_get_fund_info;
+mod avanza_search;
 mod ghostfolio_api;
 
-use crate::ghostfolio_api::prepare_insert_fund;
-use crate::AvanzaGetFundInfo::get_avanza_fund_info;
-use crate::AvanzaSearch::{search_avanza, Hit};
-use csv::{Reader, ReaderBuilder, StringRecord};
+use crate::avanza_get_fund_info::get_avanza_fund_info;
+use crate::avanza_search::{search_avanza, Hit};
+use csv::{ReaderBuilder, StringRecord};
 use dotenv::dotenv;
 use futures::stream::StreamExt;
-use rocket::fairing::{self, Fairing, Info, Kind};
+use rocket::fairing::{Fairing, Info, Kind};
 use rocket::form::Form;
 use rocket::fs::TempFile;
-use rocket::local::asynchronous::Client;
+
 use rocket::serde::{json::Json, Deserialize};
-use rocket::{tokio, Build, Data, Orbit, Request, Response, Rocket};
+use rocket::{tokio, Orbit, Request, Rocket};
 use rocket_db_pools::{sqlx, Database};
 use rocket_dyn_templates::{context, Template};
 use serde::Serialize;
@@ -70,7 +69,7 @@ impl Fairing for PostLaunchFairing {
 
 async fn scrape_job(client: &reqwest::Client) -> () {
     // Call localhost:8000/perform-scrape
-    let mut response = client
+    let response = client
         .get("http://localhost:8000/perform-scrape")
         .send()
         .await;
@@ -187,10 +186,7 @@ fn get_tickers_from_csv<'a>(path: &'a Path, isin_column: &'a String) -> Vec<Stri
 }
 
 #[post("/init", data = "<data>")]
-async fn init_form(
-    mut db: Connection<GhostfolioDB>,
-    mut data: Form<InitTickersFormData<'_>>,
-) -> Template {
+async fn init_form(db: Connection<GhostfolioDB>, data: Form<InitTickersFormData<'_>>) -> Template {
     println!("Column: {}", data.isin_column);
     // println!("File: {:#?} ", data.csv);
 
@@ -232,7 +228,7 @@ struct SelectTickersForm {
 }
 #[post("/select-tickers", data = "<data>")]
 async fn select_tickers(
-    mut db: Connection<GhostfolioDB>,
+    db: Connection<GhostfolioDB>,
     data: Form<SelectTickersForm>,
 ) -> &'static str {
     println!("Data: {:#?}", data);
