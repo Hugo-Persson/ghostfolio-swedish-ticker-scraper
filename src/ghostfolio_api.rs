@@ -96,6 +96,11 @@ pub struct GhostfolioAPI {
     db: Connection<GhostfolioDB>,
 }
 
+#[derive(Debug)]
+pub struct SymbolInfo {
+    id: String,
+    orderbook_id: String,
+}
 impl GhostfolioAPI {
     pub fn new(db: Connection<GhostfolioDB>) -> Self {
         Self { db: db }
@@ -134,6 +139,33 @@ impl GhostfolioAPI {
         match res {
             Ok(_) => Ok(()),
             Err(err) => Err(err),
+        }
+    }
+
+    pub async fn get_our_tickers(&mut self) -> Vec<SymbolInfo> {
+        let query = r#"SELECT id, "scraperConfiguration" ->> 'orderbook_id' AS orderbook_id FROM "SymbolProfile" WHERE
+                                                                                            "scraperConfiguration" IS NOT NULL
+                                                                                        AND "scraperConfiguration" ->> 'source' = 'avanza';"#;
+        let res = sqlx::query(query).fetch_all(&mut *self.db).await;
+        match res {
+            Ok(rows) => {
+                let symbols: Vec<SymbolInfo> = rows
+                    .iter()
+                    .map(|row| {
+                        println!("Column names: {:?}", row.columns());
+                        let id: String = row.try_get("id").expect("Could not get id");
+                        let orderbook_id: String = row
+                            .try_get("orderbook_id")
+                            .expect("Could not get orderbook_id");
+                        SymbolInfo { id, orderbook_id }
+                    })
+                    .collect();
+                symbols
+            }
+            Err(err) => {
+                println!("Error: {}", err);
+                vec![]
+            }
         }
     }
 }

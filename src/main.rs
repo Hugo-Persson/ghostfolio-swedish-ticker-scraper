@@ -247,6 +247,9 @@ async fn select_tickers(
 }
 
 #[get("/perform-scrape")]
-async fn perform_scrape() -> &'static str {
+async fn perform_scrape(db: Connection<GhostfolioDB>) -> &'static str {
+    let mut ghost_api = ghostfolio_api::GhostfolioAPI::new(db);
+    let scrape_targets = ghost_api.get_our_tickers().await;
+    println!("Scrape targets: {:#?}", scrape_targets);
     "Hello"
 }
