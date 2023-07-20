@@ -98,8 +98,15 @@ pub struct GhostfolioAPI {
 
 #[derive(Debug)]
 pub struct SymbolInfo {
-    id: String,
-    orderbook_id: String,
+    pub id: String,
+    pub orderbook_id: String,
+    pub symbol: String,
+}
+
+#[derive(Debug)]
+pub struct MarketData {
+    pub symbol: String,
+    pub market_price: f64,
 }
 impl GhostfolioAPI {
     pub fn new(db: Connection<GhostfolioDB>) -> Self {
@@ -143,7 +150,7 @@ impl GhostfolioAPI {
     }
 
     pub async fn get_our_tickers(&mut self) -> Vec<SymbolInfo> {
-        let query = r#"SELECT id, "scraperConfiguration" ->> 'orderbook_id' AS orderbook_id FROM "SymbolProfile" WHERE
+        let query = r#"SELECT id, symbol, "scraperConfiguration" ->> 'orderbook_id' AS orderbook_id FROM "SymbolProfile" WHERE
                                                                                             "scraperConfiguration" IS NOT NULL
                                                                                         AND "scraperConfiguration" ->> 'source' = 'avanza';"#;
         let res = sqlx::query(query).fetch_all(&mut *self.db).await;
@@ -152,12 +159,16 @@ impl GhostfolioAPI {
                 let symbols: Vec<SymbolInfo> = rows
                     .iter()
                     .map(|row| {
-                        println!("Column names: {:?}", row.columns());
                         let id: String = row.try_get("id").expect("Could not get id");
                         let orderbook_id: String = row
                             .try_get("orderbook_id")
                             .expect("Could not get orderbook_id");
-                        SymbolInfo { id, orderbook_id }
+                        let symbol = row.try_get("symbol").expect("Could not get symbol");
+                        SymbolInfo {
+                            id,
+                            orderbook_id,
+                            symbol,
+                        }
                     })
                     .collect();
                 symbols
@@ -166,6 +177,23 @@ impl GhostfolioAPI {
                 println!("Error: {}", err);
                 vec![]
             }
+        }
+    }
+
+    pub async fn insert_market_data(
+        &mut self,
+        data: MarketData,
+    ) -> Result<(), rocket_db_pools::sqlx::Error> {
+        let query = r#"INSERT INTO public."MarketData" ("createdAt", date, id, symbol, "marketPrice", "dataSource", state) VALUES ('2023-07-20 20:01:14.000', '2023-07-20 20:01:16.000', $1, $2, $3, 'MANUAL'::"DataSource", 'CLOSE'::"MarketDataState");"#;
+        let res = sqlx::query(query)
+            .bind(generate_id())
+            .bind(data.symbol)
+            .bind(data.market_price)
+            .execute(&mut *self.db)
+            .await;
+        match res {
+            Ok(_) => Ok(()),
+            Err(err) => Err(err),
         }
     }
 }

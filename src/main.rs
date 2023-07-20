@@ -8,6 +8,7 @@ mod ghostfolio_api;
 
 use crate::avanza_get_fund_info::get_avanza_fund_info;
 use crate::avanza_search::{search_avanza, Hit};
+use crate::ghostfolio_api::MarketData;
 use csv::{ReaderBuilder, StringRecord};
 use dotenv::dotenv;
 use futures::stream::StreamExt;
@@ -250,6 +251,19 @@ async fn select_tickers(
 async fn perform_scrape(db: Connection<GhostfolioDB>) -> &'static str {
     let mut ghost_api = ghostfolio_api::GhostfolioAPI::new(db);
     let scrape_targets = ghost_api.get_our_tickers().await;
+    for target in &scrape_targets {
+        let res = get_avanza_fund_info(&target.orderbook_id).await.unwrap();
+        println!("Scraping symbol: {}", target.symbol);
+        let data = MarketData {
+            symbol: target.symbol.clone(),
+            market_price: res.nav,
+        };
+        println!("Market data: {:#?}", data);
+        match ghost_api.insert_market_data(data).await {
+            Ok(_) => println!("Ok"),
+            Err(err) => println!("Error: {}", err),
+        }
+    }
     println!("Scrape targets: {:#?}", scrape_targets);
     "Hello"
 }
