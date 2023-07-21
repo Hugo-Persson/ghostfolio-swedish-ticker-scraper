@@ -3,6 +3,7 @@
 extern crate rocket;
 
 mod avanza_get_fund_info;
+mod avanza_get_stock_info;
 mod avanza_search;
 mod ghostfolio_api;
 

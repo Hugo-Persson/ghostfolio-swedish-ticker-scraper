@@ -1,5 +1,8 @@
+use core::fmt;
+
 use crate::avanza_get_fund_info::AvanzaFundInfo;
 use crate::GhostfolioDB;
+use serde::Serialize;
 use uuid::Uuid;
 
 use rocket_db_pools::sqlx::Row;
@@ -36,10 +39,28 @@ fn generate_url(orderbook_id: &String) -> String {
     )
 }
 
-fn scraper_config(orderbook_id: &String) -> Result<std::string::String, serde_json::Error> {
+#[derive(Serialize)]
+enum SymbolType {
+    STOCK,
+    MutualFund,
+}
+impl fmt::Display for SymbolType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::STOCK => write!(f, "STOCK"),
+            Self::MutualFund => write!(f, "MUTUALFUND"),
+        }
+    }
+}
+
+fn scraper_config(
+    orderbook_id: &String,
+    symbol_type: SymbolType,
+) -> Result<std::string::String, serde_json::Error> {
     let value = json!({
         "source": "avanza",
-        "orderbook_id": orderbook_id
+        "orderbook_id": orderbook_id,
+        "symbol_type": symbol_type
     });
     serde_json::to_string(&value)
 }
