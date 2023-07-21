@@ -72,10 +72,7 @@ pub struct CountryChartDaum {
     pub y: f64,
     #[serde(rename = "type")]
     pub type_field: String,
-    // pub currency: String,
     pub country_code: String,
-    // pub isin: Value,
-    // pub orderbook_id: Value,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

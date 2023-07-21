@@ -3,8 +3,9 @@ use std::error::Error;
 use lazy_static::lazy_static;
 use serde_json::{json, Value};
 
-
 use serde::{Deserialize, Serialize};
+
+use crate::ghostfolio_api::{SymbolInfo, SymbolType};
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +21,7 @@ pub struct AvanzaSearchResult {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResultGroup {
-    // pub instrument_type: String,
+    pub instrument_type: String,
     // pub number_of_hits: i64,
     pub hits: Vec<Hit>,
     // pub instrument_display_name: String,
@@ -83,7 +84,7 @@ fn prepare_avanza_search_body(isin: &String) -> serde_json::Value {
     })
 }
 
-pub async fn search_avanza(isin: &String) -> Result<(&String, Hit), Box<dyn Error>> {
+pub async fn search_avanza(isin: &String) -> Result<(SymbolType, Hit), Box<dyn Error>> {
     let url = "https://www.avanza.se/_api/search/global-search?limit=10";
     let post_body = prepare_avanza_search_body(isin);
     info!("Post body: {:#?}", post_body);
@@ -91,8 +92,9 @@ pub async fn search_avanza(isin: &String) -> Result<(&String, Hit), Box<dyn Erro
     // Check if the request was successful (status code 200)
     if response.status().is_success() {
         let mut parsed_response: AvanzaSearchResult = response.json().await?;
-        let hit = parsed_response.result_groups.remove(0).hits.remove(0);
-        Ok((isin, hit))
+        let mut group = parsed_response.result_groups.remove(0);
+        let hit = group.hits.remove(0);
+        Ok((SymbolType::from_str(group.instrument_type.as_str()), hit))
     } else {
         Err("Errr".into())
     }

@@ -7,18 +7,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AvanzaStockInfo {
-    // pub orderbook_id: String,
-    // pub name: String,
-    // pub isin: String,
-    // pub instrument_id: String,
+    pub orderbook_id: String,
+    pub name: String,
+    pub isin: String,
+    pub instrument_id: String,
     pub sectors: Vec<Sector>,
-    // pub tradable: String,
-    // pub listing: Listing,
-    // pub historical_closing_prices: HistoricalClosingPrices,
-    // pub key_indicators: KeyIndicators,
     pub quote: Quote,
-    // #[serde(rename = "type")]
-    // pub type_field: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

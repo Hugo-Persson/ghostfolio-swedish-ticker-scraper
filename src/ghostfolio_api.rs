@@ -1,6 +1,7 @@
 use core::fmt;
 
 use crate::avanza_get_fund_info::AvanzaFundInfo;
+use crate::avanza_get_stock_info::AvanzaStockInfo;
 use crate::GhostfolioDB;
 use serde::Serialize;
 use uuid::Uuid;
@@ -39,8 +40,8 @@ fn generate_url(orderbook_id: &String) -> String {
     )
 }
 
-#[derive(Serialize)]
-enum SymbolType {
+#[derive(Serialize, PartialEq)]
+pub enum SymbolType {
     STOCK,
     MutualFund,
 }
@@ -80,11 +81,30 @@ fn generate_sectors_json(info: &AvanzaFundInfo) -> Result<std::string::String, s
         .collect();
     serde_json::to_string(&sectors)
 }
-fn generate_ticker_name(info: &AvanzaFundInfo) -> String {
-    info.name.replace(" ", "_").to_uppercase()
+fn generate_ticker_name(name: &String) -> String {
+    name.replace(" ", "_").to_uppercase()
 }
 fn generate_id() -> String {
     Uuid::new_v4().to_string()
+}
+
+/// Returns the query to insert a symbol into the database
+/// # Arguments
+/// 1. `companies` - The companies that the symbol invest in, as a json string
+/// 2. `id` - The id of the symbol
+/// 3. `name` - The name of the symbol
+/// 4. `symbol` - The symbol of the symbol
+/// 5. `sectors` - The sectors that the symbol invest in, as a json string
+/// 6. `scraper_configuration` - The scraper configuration of the symbol
+/// 7. `url` - The url to the symbol
+/// 8. `isin` - The isin of the symbol
+fn get_insert_symbol_query() -> &'static str {
+    r#"INSERT INTO public."SymbolProfile" (countries, "createdAt", "dataSource", id, name, "updatedAt", symbol, sectors,
+    currency, "assetClass", "assetSubClass", "symbolMapping", "scraperConfiguration",
+    url, comment, isin) VALUES 
+    ($1, current_timestamp, 'MANUAL'::"DataSource", $2, $3, current_timestamp, $4, $5, 'SEK', 'EQUITY'::"AssetClass", 'MUTUALFUND'::"AssetSubClass", null, $6,
+$7, null, $8);
+"#
 }
 
 pub fn prepare_insert_fund(
@@ -104,9 +124,9 @@ VALUES ('{}', current_timestamp, 'MANUAL'::"DataSource", '{}', '{}',
         generate_country_json(&info),
         generate_id(),
         info.name,
-        generate_ticker_name(&info),
+        generate_ticker_name(&info.name),
         generate_sectors_json(&info)?,
-        scraper_config(orderbook_id)?,
+        scraper_config(orderbook_id, SymbolType::MutualFund)?,
         generate_url(orderbook_id),
         info.isin,
     );
@@ -124,6 +144,15 @@ pub struct SymbolInfo {
     pub symbol: String,
 }
 
+impl SymbolType {
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "STOCK" => Self::STOCK,
+            "FUND" => Self::MutualFund,
+            _ => panic!("Unknown symbol type"),
+        }
+    }
+}
 #[derive(Debug)]
 pub struct MarketData {
     pub symbol: String,
@@ -216,5 +245,24 @@ impl GhostfolioAPI {
             Ok(_) => Ok(()),
             Err(err) => Err(err),
         }
+    }
+
+    pub async fn insert_stock_symbol(
+        &mut self,
+        data: AvanzaStockInfo,
+    ) -> Result<(), rocket_db_pools::sqlx::Error> {
+        let query = get_insert_symbol_query();
+        let res = sqlx::query(query)
+            .bind("[]")
+            .bind(generate_id())
+            .bind(&data.name)
+            .bind(generate_ticker_name(&data.name))
+            .bind("[]")
+            .bind(scraper_config(&data.orderbook_id, SymbolType::STOCK).unwrap())
+            .bind(generate_url(&data.orderbook_id))
+            .bind(data.isin)
+            .execute(&mut *self.db)
+            .await?;
+        Ok(())
     }
 }
