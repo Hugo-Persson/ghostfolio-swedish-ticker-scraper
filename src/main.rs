@@ -203,12 +203,12 @@ async fn init_form(db: Connection<GhostfolioDB>, data: Form<InitTickersFormData<
         .filter(|x| !isin_in_db.contains(x))
         .take(10)
         .map(search_avanza); // We only take 10 at a time. Buld
-    let mut hits_result: Vec<Hit> = vec![];
+    let mut hits_result: Vec<(String, Hit)> = vec![];
     for hit in hits_async {
         let res = hit.await;
         match res {
-            Ok((_isin, hit)) => {
-                hits_result.push(hit);
+            Ok((symbol, hit)) => {
+                hits_result.push((symbol.to_string(), hit));
             }
             Err(err) => println!("Error: {}", err),
         }
@@ -228,7 +228,6 @@ async fn init_form(db: Connection<GhostfolioDB>, data: Form<InitTickersFormData<
 #[derive(FromForm, Debug)]
 struct SelectTickersForm {
     ids: Vec<String>,
-    symbol_type: Vec<String>,
 }
 #[post("/select-tickers", data = "<data>")]
 async fn select_tickers(
@@ -237,17 +236,18 @@ async fn select_tickers(
 ) -> &'static str {
     println!("Data: {:#?}", data);
     let mut ghost_api = ghostfolio_api::GhostfolioAPI::new(db);
-    let symbol_types = data.symbol_type.clone();
-    for id in &data.ids {
-        let symbol = SymbolType::from_str(symbol_types.get(0).unwrap());
-        if (symbol == SymbolType::STOCK) {
+    for id_symbol in &data.ids {
+        let mut split_result = id_symbol.split("-");
+        let id = split_result.next().unwrap();
+        let symbol = SymbolType::from_str(split_result.next().unwrap());
+        if symbol == SymbolType::STOCK {
             let stock_info = avanza_get_stock_info::avanza_get_stock_info(id)
                 .await
                 .unwrap();
             let _ = ghost_api.insert_stock_symbol(stock_info).await;
-        } else if (symbol == SymbolType::MutualFund) {
-            let fund_info = get_avanza_fund_info(id).await.unwrap();
-            let _ = ghost_api.insert_fund(fund_info, id).await;
+        } else if symbol == SymbolType::MUTUALFUND {
+            let fund_info = get_avanza_fund_info(&id.to_string()).await.unwrap();
+            let _ = ghost_api.insert_fund(fund_info, &id.to_string()).await;
         }
     }
 
@@ -280,7 +280,7 @@ async fn perform_scrape(db: Connection<GhostfolioDB>) -> &'static str {
     for target in &scrape_targets {
         let data = match SymbolType::from_str(&target.symbol) {
             SymbolType::STOCK => get_market_data_for_stock(target).await,
-            SymbolType::MutualFund => get_market_data_for_fund(target).await,
+            SymbolType::MUTUALFUND => get_market_data_for_fund(target).await,
         };
         println!("Market data: {:#?}", data);
         match ghost_api.insert_market_data(data).await {

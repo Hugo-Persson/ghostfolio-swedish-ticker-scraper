@@ -43,13 +43,14 @@ fn generate_url(orderbook_id: &String) -> String {
 #[derive(Serialize, PartialEq)]
 pub enum SymbolType {
     STOCK,
-    MutualFund,
+    #[serde(rename = "FUND")]
+    MUTUALFUND,
 }
 impl fmt::Display for SymbolType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::STOCK => write!(f, "STOCK"),
-            Self::MutualFund => write!(f, "MUTUALFUND"),
+            Self::MUTUALFUND => write!(f, "FUND"),
         }
     }
 }
@@ -126,7 +127,7 @@ VALUES ('{}', current_timestamp, 'MANUAL'::"DataSource", '{}', '{}',
         info.name,
         generate_ticker_name(&info.name),
         generate_sectors_json(&info)?,
-        scraper_config(orderbook_id, SymbolType::MutualFund)?,
+        scraper_config(orderbook_id, SymbolType::MUTUALFUND)?,
         generate_url(orderbook_id),
         info.isin,
     );
@@ -148,7 +149,7 @@ impl SymbolType {
     pub fn from_str(s: &str) -> Self {
         match s {
             "STOCK" => Self::STOCK,
-            "FUND" => Self::MutualFund,
+            "FUND" => Self::MUTUALFUND,
             _ => panic!("Unknown symbol type"),
         }
     }

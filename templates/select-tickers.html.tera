@@ -11,14 +11,15 @@ content %}
       <th>price</th>
     </thead>
     <tbody>
-      {% for hit in hits %}
+      {% for hit_tuple in hits %} {% set hit = hit_tuple.1 %} {% set symbol_info
+      = hit_tuple.0%}
       <tr>
         <td>
           <input
             class="form-check-input"
             type="checkbox"
             name="ids[]"
-            value="{{ hit.link.orderbookId }}"
+            value="{{ hit.link.orderbookId }}-{{ symbol_info }}"
           />
         </td>
         <td>{{ hit.highlightedDisplayTitle }}</td>
