@@ -24,6 +24,7 @@ use rocket_db_pools::{sqlx, Database};
 use rocket_dyn_templates::{context, Template};
 use serde::Serialize;
 use serde_json::json;
+use std::error::Error;
 use std::path::Path;
 
 #[derive(Database)]
@@ -229,6 +230,25 @@ async fn init_form(db: Connection<GhostfolioDB>, data: Form<InitTickersFormData<
 struct SelectTickersForm {
     ids: Vec<String>,
 }
+
+async fn select_stock(
+    orderbook_id: &String,
+    ghost_api: &mut ghostfolio_api::GhostfolioAPI,
+) -> Result<(), Box<dyn Error>> {
+    let stock_info = avanza_get_stock_info::avanza_get_stock_info(&orderbook_id).await?;
+    let _ = ghost_api.insert_stock_symbol(stock_info).await?;
+    Ok(())
+}
+
+async fn select_fund(
+    orderbook_id: &String,
+    ghost_api: &mut ghostfolio_api::GhostfolioAPI,
+) -> Result<(), Box<dyn Error>> {
+    let fund_info = get_avanza_fund_info(&orderbook_id).await?;
+    let _ = ghost_api.insert_fund(fund_info, &orderbook_id).await;
+    Ok(())
+}
+
 #[post("/select-tickers", data = "<data>")]
 async fn select_tickers(
     db: Connection<GhostfolioDB>,
@@ -240,14 +260,19 @@ async fn select_tickers(
         let mut split_result = id_symbol.split("-");
         let id = split_result.next().unwrap();
         let symbol = SymbolType::from_str(split_result.next().unwrap());
+
         if symbol == SymbolType::STOCK {
-            let stock_info = avanza_get_stock_info::avanza_get_stock_info(id)
-                .await
-                .unwrap();
-            let _ = ghost_api.insert_stock_symbol(stock_info).await;
-        } else if symbol == SymbolType::MUTUALFUND {
-            let fund_info = get_avanza_fund_info(&id.to_string()).await.unwrap();
-            let _ = ghost_api.insert_fund(fund_info, &id.to_string()).await;
+            let res = select_stock(&id.to_string(), &mut ghost_api).await;
+            match res {
+                Ok(_) => println!("Ok, stock inserted. id: {}", id),
+                Err(err) => println!("Error: {}", err),
+            }
+        } else if (symbol == SymbolType::MUTUALFUND) {
+            let res = select_fund(&id.to_string(), &mut ghost_api).await;
+            match res {
+                Ok(_) => println!("Ok, fund inserted. id: {}", id),
+                Err(err) => println!("Error, fund not inserted, id: {}, message: {}", id, err),
+            }
         }
     }
 
@@ -266,7 +291,6 @@ async fn get_market_data_for_stock(target: &SymbolInfo) -> MarketData {
 }
 async fn get_market_data_for_fund(target: &SymbolInfo) -> MarketData {
     let fund_info = get_avanza_fund_info(&target.orderbook_id).await.unwrap();
-    println!("Fund info: {:#?}", fund_info);
     MarketData {
         symbol: target.symbol.clone(),
         market_price: fund_info.nav,
@@ -278,7 +302,7 @@ async fn perform_scrape(db: Connection<GhostfolioDB>) -> &'static str {
     let mut ghost_api = ghostfolio_api::GhostfolioAPI::new(db);
     let scrape_targets = ghost_api.get_our_tickers().await;
     for target in &scrape_targets {
-        let data = match SymbolType::from_str(&target.symbol) {
+        let data = match target.symbol_type {
             SymbolType::STOCK => get_market_data_for_stock(target).await,
             SymbolType::MUTUALFUND => get_market_data_for_fund(target).await,
         };

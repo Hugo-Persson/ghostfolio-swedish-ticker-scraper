@@ -40,7 +40,7 @@ fn generate_url(orderbook_id: &String) -> String {
     )
 }
 
-#[derive(Serialize, PartialEq)]
+#[derive(Serialize, PartialEq, Debug)]
 pub enum SymbolType {
     STOCK,
     #[serde(rename = "FUND")]
@@ -58,13 +58,13 @@ impl fmt::Display for SymbolType {
 fn scraper_config(
     orderbook_id: &String,
     symbol_type: SymbolType,
-) -> Result<std::string::String, serde_json::Error> {
+) -> Result<serde_json::Value, serde_json::Error> {
     let value = json!({
         "source": "avanza",
         "orderbook_id": orderbook_id,
         "symbol_type": symbol_type
     });
-    serde_json::to_string(&value)
+    Ok(value)
 }
 fn generate_sectors_json(info: &AvanzaFundInfo) -> Result<std::string::String, serde_json::Error> {
     if info.sector_chart_data.len() == 0 {
@@ -91,7 +91,7 @@ fn generate_id() -> String {
 
 /// Returns the query to insert a symbol into the database
 /// # Arguments
-/// 1. `companies` - The companies that the symbol invest in, as a json string
+/// 1. `countries` - The countries that the symbol invest in, as a json string
 /// 2. `id` - The id of the symbol
 /// 3. `name` - The name of the symbol
 /// 4. `symbol` - The symbol of the symbol
@@ -143,10 +143,12 @@ pub struct SymbolInfo {
     pub id: String,
     pub orderbook_id: String,
     pub symbol: String,
+    pub symbol_type: SymbolType,
 }
 
 impl SymbolType {
     pub fn from_str(s: &str) -> Self {
+        println!("s: {}", s);
         match s {
             "STOCK" => Self::STOCK,
             "FUND" => Self::MUTUALFUND,
@@ -201,7 +203,7 @@ impl GhostfolioAPI {
     }
 
     pub async fn get_our_tickers(&mut self) -> Vec<SymbolInfo> {
-        let query = r#"SELECT id, symbol, "scraperConfiguration" ->> 'orderbook_id' AS orderbook_id FROM "SymbolProfile" WHERE
+        let query = r#"SELECT id, symbol,"scraperConfiguration" ->> 'symbol_type' AS symbol_type, "scraperConfiguration" ->> 'orderbook_id' AS orderbook_id FROM "SymbolProfile" WHERE
                                                                                             "scraperConfiguration" IS NOT NULL
                                                                                         AND "scraperConfiguration" ->> 'source' = 'avanza';"#;
         let res = sqlx::query(query).fetch_all(&mut *self.db).await;
@@ -215,10 +217,14 @@ impl GhostfolioAPI {
                             .try_get("orderbook_id")
                             .expect("Could not get orderbook_id");
                         let symbol = row.try_get("symbol").expect("Could not get symbol");
+                        let symbol_type: String = row
+                            .try_get("symbol_type")
+                            .expect("Could not get symbol_type");
                         SymbolInfo {
                             id,
                             orderbook_id,
                             symbol,
+                            symbol_type: SymbolType::from_str(&symbol_type),
                         }
                     })
                     .collect();
@@ -235,7 +241,7 @@ impl GhostfolioAPI {
         &mut self,
         data: MarketData,
     ) -> Result<(), rocket_db_pools::sqlx::Error> {
-        let query = r#"INSERT INTO public."MarketData" ("createdAt", date, id, symbol, "marketPrice", "dataSource", state) VALUES ('2023-07-20 20:01:14.000', '2023-07-20 20:01:16.000', $1, $2, $3, 'MANUAL'::"DataSource", 'CLOSE'::"MarketDataState");"#;
+        let query = r#"INSERT INTO public."MarketData" ("createdAt", date, id, symbol, "marketPrice", "dataSource", state) VALUES (current_timestamp, current_timestamp, $1, $2, $3, 'MANUAL'::"DataSource", 'CLOSE'::"MarketDataState");"#;
         let res = sqlx::query(query)
             .bind(generate_id())
             .bind(data.symbol)
@@ -254,16 +260,17 @@ impl GhostfolioAPI {
     ) -> Result<(), rocket_db_pools::sqlx::Error> {
         let query = get_insert_symbol_query();
         let res = sqlx::query(query)
-            .bind("[]")
+            .bind(json!([]))
             .bind(generate_id())
             .bind(&data.name)
-            .bind(generate_ticker_name(&data.name))
-            .bind("[]")
+            .bind(&data.listing.ticker_symbol)
+            .bind(json!([]))
             .bind(scraper_config(&data.orderbook_id, SymbolType::STOCK).unwrap())
             .bind(generate_url(&data.orderbook_id))
             .bind(data.isin)
             .execute(&mut *self.db)
             .await?;
+        println!("Res: {:#?}", res);
         Ok(())
     }
 }

@@ -11,15 +11,15 @@ pub struct AvanzaStockInfo {
     pub name: String,
     pub isin: String,
     pub instrument_id: String,
-    pub sectors: Vec<Sector>,
     pub quote: Quote,
+    pub listing: Listing,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Sector {
-    pub sector_id: String,
-    pub sector_name: String,
+pub struct Listing {
+    pub ticker_symbol: String,
+    pub currency: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -43,15 +43,17 @@ lazy_static! {
 }
 pub async fn avanza_get_stock_info(orderbook_id: &str) -> Result<AvanzaStockInfo, Box<dyn Error>> {
     let url = format!(
-        "https://www.avanza.se/_mobile/market/stock/{}",
+        "https://www.avanza.se/_api/market-guide/stock/{}",
         orderbook_id
     );
+    println!("Url: {}", url);
     let response = CLIENT.get(url).send().await?;
     // Check if the request was successful (status code 200)
     if response.status().is_success() {
         let parsed_response: AvanzaStockInfo = response.json().await?;
         Ok(parsed_response)
     } else {
+        println!("Error: {:#?}", response.text().await?);
         Err("Errr".into())
     }
 }
