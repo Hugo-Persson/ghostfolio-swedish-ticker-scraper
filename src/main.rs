@@ -306,12 +306,10 @@ async fn perform_scrape(db: Connection<GhostfolioDB>) -> &'static str {
             SymbolType::STOCK => get_market_data_for_stock(target).await,
             SymbolType::MUTUALFUND => get_market_data_for_fund(target).await,
         };
-        println!("Market data: {:#?}", data);
         match ghost_api.insert_market_data(data).await {
             Ok(_) => println!("Ok"),
             Err(err) => println!("Error: {}", err),
         }
     }
-    println!("Scrape targets: {:#?}", scrape_targets);
     "Hello"
 }
