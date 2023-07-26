@@ -39,6 +39,7 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v2
         with:
@@ -46,6 +47,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
           tags: ${{github.ref_name}}
+
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
@@ -54,6 +56,8 @@ jobs:
 
       - name: Build and push Docker images
         uses: docker/bake-action@v2.3.0
+        env:
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
         with:
           push: true
           set: |
