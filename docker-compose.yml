@@ -3,6 +3,8 @@ services:
   app:
     env_file:
       - .env
+    environment:
+      - ROCKET_TEMPLATES_DIR=/app/templates
     build:
       context: .
       dockerfile: Dockerfile

@@ -1,0 +1,16 @@
+
+/target/
+
+
+
+**/*.rs.bk
+
+
+/target
+.DS_Store
+.env
+
+Dockerfile
+docker-compose.yml
+.dockerignore
+LICENSE
