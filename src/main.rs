@@ -267,7 +267,7 @@ async fn select_tickers(
                 Ok(_) => println!("Ok, stock inserted. id: {}", id),
                 Err(err) => println!("Error: {}", err),
             }
-        } else if (symbol == SymbolType::MUTUALFUND) {
+        } else if symbol == SymbolType::MUTUALFUND {
             let res = select_fund(&id.to_string(), &mut ghost_api).await;
             match res {
                 Ok(_) => println!("Ok, fund inserted. id: {}", id),

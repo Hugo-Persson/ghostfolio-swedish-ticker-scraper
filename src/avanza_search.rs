@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 
 use serde::{Deserialize, Serialize};
 
-use crate::ghostfolio_api::{SymbolInfo, SymbolType};
+use crate::ghostfolio_api::{SymbolType};
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
