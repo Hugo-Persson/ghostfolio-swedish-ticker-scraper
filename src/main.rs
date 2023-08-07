@@ -57,7 +57,7 @@ impl Fairing for PostLaunchFairing {
     async fn on_liftoff(&self, _rocket: &Rocket<Orbit>) {
         println!("Liftoff!");
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(std::time::Duration::from_secs(60 * 15));
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(60 * 60)); // Once an hour
             let client: reqwest::Client = reqwest::Client::new();
             loop {
                 interval.tick().await;
